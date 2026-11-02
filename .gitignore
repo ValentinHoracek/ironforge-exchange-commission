@@ -1,0 +1,24 @@
+# Local working docs (superpowers specs and plans, original brief)
+docs/
+
+# Personal Claude Code context (not for the public repo)
+CLAUDE.local.md
+
+# Secrets and local config
+.env
+*.tfvars
+!*.tfvars.example
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# Local data snapshots
+data/
