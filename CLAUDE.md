@@ -17,10 +17,10 @@ A second goal: let Claude architect the DevOps part. Code, docs and commit histo
 
 ## Hard constraints
 
-- **Cost:** **$15 per month hard cap for everything** (raised from $5–10 on 2026-11-02). The chosen design costs about $1–2.
+- **Cost:** **$15 per month hard cap for everything** (raised from $5–10 on 2026-11-02); the Azure budget is set as **€15/month** (billing currency). The chosen design costs about $1–2.
 - **One location:** everything runs in **one Azure subscription**. Do not add external free-tier services (Supabase, Grafana Cloud, Databricks, MotherDuck, etc.).
 - **CI/CD:** GitHub Actions (GitHub is allowed next to Azure; runtime stays in Azure). Container images in GHCR (free), not ACR (~$5).
-- Raw data is about 4 GB per month uncompressed (estimate from the original brief, not measured yet). Storage must stay cheap for years.
+- Raw data: the brief estimated about 4 GB per month uncompressed. **First measurement (2026-11-06): v1 scope (commodities of houses 111 + 114) is ~6.5 MB raw per snapshot, ~4.7 GB/month raw** – the estimate holds. Storage must stay cheap for years.
 
 ## Architecture: decided (option C, "serverless, no VM") – 2026-11-02
 
@@ -99,12 +99,12 @@ The original brief is in `docs/original-brief.md` (local only, `docs/` is gitign
 - **Repo: public since 2026-11-02** – https://github.com/ValentinHoracek/ironforge-exchange-commission. Every commit is visible immediately: no secrets, no personal data, no internal notes in git. Consequences: GHCR images are public packages (no pull credential needed, so images must never contain secrets); GitHub `prod` environment with required reviewers is free and is used for prod approvals; GitHub Actions minutes are free.
 - **Security and quality checks in CI: yes** (e.g. checkov/tfsec for Terraform, Trivy for images, tests, linting). Exact tools are Claude's call.
 - **Environments: dev + prod.** Same Terraform, two state files / resource groups; dev ingests less often or on demand. Prod deploys need approval in the GitHub `prod` environment (required reviewers).
-- **Markets:** Forever has no realm list – one mega-server per region × ruleset, one auction house per region × ruleset × faction (pre-launch sources). **v1 = EU, Normal (PvE) ruleset, Alliance + Horde (2 markets).** `region`, `ruleset`, `faction` are dimensions from day one. (Superseded note:) start with the **PvE** ruleset only. Note: if Forever commodities are region-wide (like retail), realm ruleset does not matter for commodities – it matters for realm-specific items later.
+- **Markets:** Forever has no realm list – one mega-server per region × ruleset, one auction house per region × ruleset × faction (pre-launch sources). **v1 = EU, Normal (PvE) ruleset, Alliance + Horde (2 markets).** `region`, `ruleset`, `faction` are dimensions from day one. **Verified 2026-11-06:** markets are auction house IDs – **EU Normal Alliance = house 111 (verified by marker listing)**, **EU Normal Horde = house 114 (inferred, still to verify)**. Commodities are per house, not region-wide. **v1 captures and analyses only houses 111 and 114** (owner, 2026-11-06); the other 13 houses are not captured yet. Blackwater = neutral NPC (goblin) auction house, a gold sink – out of scope. Details: design doc §5.1.1.
 - **Retention:** move Bronze to a cheaper tier after **6 months**. Proposed (Claude): Bronze hot → cold at 180 days (still online, instant access, higher read cost); Silver/Gold stay hot; **no Archive tier** (offline, hours to restore – breaks "rebuild from raw").
 - **Controls register:** wanted eventually, **not now**.
 - **Addon and domain:** later.
 
-- **Bootstrap:** the owner has **nothing set up yet** – must find/create an Azure account + pay-as-you-go subscription (dedicated to IFEC recommended) and create a Blizzard developer account + API client. Documented manual bootstrap is the only allowed click-ops.
+- **Bootstrap:** documented manual bootstrap is the only allowed click-ops. Progress: see "Where we are in the process".
 - **Bronze immutability:** 1-year time-based retention (WORM), locked in prod at the "done" milestone (end of December 2026) – the original trigger ("before going public") no longer applies; owner to confirm. Prod Bronze storage in its own Terraform root.
 - **Design document:** `docs/superpowers/specs/2026-11-02-ifec-design.md` (builder check done, owner answers applied).
 
@@ -112,25 +112,35 @@ The original brief is in `docs/original-brief.md` (local only, `docs/` is gitign
 
 The owner already has a domain. Plan: `ifec.<owner-domain>` as a CNAME + TXT (domain validation) to the Container App. Open: which domain and registrar, and whether Terraform can manage the DNS record.
 
-## Known risk: Blizzard API for Forever
+## Blizzard API for Forever – resolved 2026-11-06 (was the main known risk)
 
-On 2026-10-28 no Forever namespace existed in the Blizzard Game Data API. All guesses (`dynamic-forever`, `dynamic-classicforever`, etc.) returned 403. Retail (`dynamic-{region}`) and Progression Classic (`dynamic-classic-{region}`) auctions work. Classic Era and Anniversary auction endpoints return 404. Forever uses the Mainline (retail-style) client.
-**Owner's decision:** assume the API will be available. If it is not, adapt later. Do not block the design on this.
-Fallback ideas if it stays closed (not chosen): use the addon as the data source (scan with `C_AuctionHouse.ReplicateItems`, upload SavedVariables; irregular, only when the owner plays), or run the pipeline on Retail / Progression Classic data until Forever opens.
-Also check after launch: whether Forever has region-wide commodities (retail has had them since 9.2.7; separate endpoint `/data/wow/auctions/commodities`). This affects the data model and partitioning (region vs. realm). Item names need the Blizzard item API (auction data has only item IDs).
+Forever auction data went live on 2026-11-06. Verified with IFEC's own API client (EU); undocumented by Blizzard, so it can change:
+- Namespace `dynamic-forever-eu` (items: `static-forever-eu`), host `eu.api.blizzard.com`.
+- House index `/data/wow/ruleset/{rs}/auctions/` (trailing slash required). Per house: `/data/wow/ruleset/{rs}/auctions/{house}` and `/.../{house}/commodities`. Retail's `/data/wow/auctions/commodities` returns 404.
+- **The ruleset ID does not filter**: all rulesets return the same 15 houses (110–121, 123–125). The house ID is the market key.
+- Dedup must hash the body: the same `Last-Modified` was once served with different content.
+- **Latency about one hour:** each house is a snapshot refreshed roughly hourly (large houses at about :22–:24 past the hour). A marker listing took up to ~1 hour to appear in the API. Events are timed only to the snapshot (±1 h); listings that appear and vanish within the hour are invisible.
+- Item names need the item API; community testers report many auctioned item IDs return 404, so names need a fallback.
 
-Reference: https://github.com/jkc-be/goldbook/issues/67
+History: on 2026-10-28 no Forever namespace existed (all guesses returned 403). Owner's decision then: assume it will be available and do not block the design. Reference: https://github.com/jkc-be/goldbook/issues/67
 
 ## Where we are in the process
 
 - Brainstorming finished. **Design approved by the owner on 2026-11-02**: `docs/superpowers/specs/2026-11-02-ifec-design.md` – read it first; it is the source of truth over this file where they differ.
-- **Next step:** the implementation plan (superpowers:writing-plans) – only when the owner asks. In parallel, the owner's own tasks: find/create the Azure account + pay-as-you-go subscription, create the Blizzard developer account + API client (develop.battle.net). WoW: Forever launches 2026-11-04; data cannot be backfilled, so getting prod ingest live early matters.
+- **Bootstrap status (2026-11-10):**
+  - ✅ Blizzard developer account + API client (2026-11-06). Credentials kept locally outside the repo; they move into Key Vault later.
+  - ✅ Azure account: subscription `ifec`, **Free Trial** (spending limit on). Owner is Owner on the subscription and Global Administrator in the tenant. Azure CLI installed in WSL and logged in.
+  - ✅ Resource providers registered: Microsoft.App, Storage, KeyVault, OperationalInsights, Insights, ManagedIdentity (CostManagement and Consumption were already on).
+  - ✅ Budget `budget-ifec-monthly`: **€15/month** (owner kept EUR, the billing currency), alerts at 50/80/100 % actual + 100 % forecasted, e-mail to the owner, expires 2029-10-31. Terraform will import it later.
+- **Next steps (owner picks):** (3) Terraform state storage – `rg-ifec-tfstate` + storage account in Sweden Central, versioning + soft delete, created by the owner; (4) write `bootstrap/README.md` documenting all manual steps so far; (5) implementation plan for milestone 1 (Terraform + ingest job). WoW: Forever launched 2026-11-04 and data cannot be backfilled, so getting prod ingest live early matters.
+- **Side tasks:** upgrade the Free Trial to pay-as-you-go **before the 30-day trial ends** (otherwise resources get disabled and ingest stops); verify Horde house 114 with a marker listing.
 - **`docs/` is gitignored on purpose:** specs, plans and the original brief stay local. Do not commit them and do not remove the ignore rule.
-- Open topics: what "done" looks like and by when, exact Grafana panels, Delta table schemas, the domain (later). **No Azure free account is available** (pay-as-you-go from day one) – the design already assumes this.
+- Open topics: what "done" looks like and by when, exact Grafana panels, Delta table schemas, the domain (later).
 
 ## Working agreements
 
 - Communicate in plain, concise English.
 - Explain *why* behind choices. The owner values evidence-based decisions.
 - Do not commit or push unless asked.
+- **The owner does the infra steps hands-on, to learn** – learning is a main goal of the project. Claude explains each step (what, why, portal path, CLI command, how to verify, what the Activity log shows) and does not run commands that change Azure unless the owner asks for that specific step. "What's next" means a plan, not execution.
 - **This repo is public.** Personal context about the owner lives in `CLAUDE.local.md` (gitignored). Never copy anything from it, or from files outside the repo, into tracked files.
