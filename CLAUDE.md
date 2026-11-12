@@ -127,12 +127,14 @@ History: on 2026-10-28 no Forever namespace existed (all guesses returned 403). 
 ## Where we are in the process
 
 - Brainstorming finished. **Design approved by the owner on 2026-11-02**: `docs/superpowers/specs/2026-11-02-ifec-design.md` – read it first; it is the source of truth over this file where they differ.
-- **Bootstrap status (2026-11-10):**
+- **Bootstrap status (2026-11-12):** full record in `bootstrap/README.md`.
   - ✅ Blizzard developer account + API client (2026-11-06). Credentials kept locally outside the repo; they move into Key Vault later.
   - ✅ Azure account: subscription `ifec`, **Free Trial** (spending limit on). Owner is Owner on the subscription and Global Administrator in the tenant. Azure CLI installed in WSL and logged in.
   - ✅ Resource providers registered: Microsoft.App, Storage, KeyVault, OperationalInsights, Insights, ManagedIdentity (CostManagement and Consumption were already on).
   - ✅ Budget `budget-ifec-monthly`: **€15/month** (owner kept EUR, the billing currency), alerts at 50/80/100 % actual + 100 % forecasted, e-mail to the owner, expires 2029-10-31. Terraform will import it later.
-- **Next steps (owner picks):** (3) Terraform state storage – `rg-ifec-tfstate` + storage account in Sweden Central, versioning + soft delete, created by the owner; (4) write `bootstrap/README.md` documenting all manual steps so far; (5) implementation plan for milestone 1 (Terraform + ingest job). WoW: Forever launched 2026-11-04 and data cannot be backfilled, so getting prod ingest live early matters.
+  - ✅ Terraform state storage (2026-11-12): `rg-ifec-tfstate` / `stifectfstate6ca2f7` / container `tfstate`, shared keys off (backend needs `use_azuread_auth = true`), versioning + 30-day soft delete, `CanNotDelete` lock, owner has Storage Blob Data Contributor. Public network access accepted (GitHub runners).
+  - ✅ `bootstrap/README.md` written (not committed yet).
+- **Next step:** implementation plan for milestone 1 (Terraform `infra/data` + `infra/platform` for prod, ingest job, image in GHCR, job-failure alert). WoW: Forever launched 2026-11-04 and data cannot be backfilled, so getting prod ingest live early matters.
 - **Side tasks:** upgrade the Free Trial to pay-as-you-go **before the 30-day trial ends** (otherwise resources get disabled and ingest stops); verify Horde house 114 with a marker listing.
 - **`docs/` is gitignored on purpose:** specs, plans and the original brief stay local. Do not commit them and do not remove the ignore rule.
 - Open topics: what "done" looks like and by when, exact Grafana panels, Delta table schemas, the domain (later).
