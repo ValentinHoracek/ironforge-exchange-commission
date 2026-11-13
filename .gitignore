@@ -3,16 +3,20 @@ docs/
 
 # Personal Claude Code context (not for the public repo)
 CLAUDE.local.md
+*.local.md
 
 # Secrets and local config
 .env
 *.tfvars
 !*.tfvars.example
+# Exception: per-environment Terraform values (names, location). Rule: never a secret in them.
+!infra/*/env/*.tfvars
 
 # Terraform
 .terraform/
 *.tfstate
 *.tfstate.*
+*.tfplan
 crash.log
 
 # Python
@@ -21,4 +25,4 @@ __pycache__/
 .venv/
 
 # Local data snapshots
-data/
+/data/

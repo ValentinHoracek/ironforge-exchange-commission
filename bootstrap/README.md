@@ -14,7 +14,7 @@ addresses) are left out on purpose, because this repository is public.
 | 2 | Azure subscription `ifec` | 2026-11-10 | ✅ |
 | 3 | Resource providers registered | 2026-11-10 | ✅ |
 | 4 | Budget `budget-ifec-monthly` | 2026-11-10 | ✅ |
-| 5 | Terraform state storage | 2026-11-12 | ✅ |
+| 5 | Terraform state storage (local users disabled 2026-11-13) | 2026-11-12 | ✅ |
 | 6 | GitHub → Azure OIDC (app registration + federated credentials) | – | planned (milestone 2) |
 
 ---
@@ -29,13 +29,11 @@ addresses) are left out on purpose, because this repository is public.
 ## 2. Azure subscription
 
 - **What:** a dedicated subscription named `ifec` in its own Entra ID tenant. The owner has the Owner role on the
-  subscription and is Global Administrator of the tenant.
+  subscription and can create Entra ID app registrations (needed later for GitHub OIDC).
 - **Why dedicated:** budgets, cost panels and RBAC can be scoped to the whole subscription without mixing in other workloads.
 - **Identity baseline:** Entra ID **security defaults** are enabled (MFA required, legacy authentication blocked).
   On 2026-11-12 they blocked an Azure CLI session whose token lacked an MFA claim (`AADSTS530035`); a fresh
   `az login` with MFA resolved it. This is the control working as intended.
-- **Note:** the subscription started as a Free Trial. It must be upgraded to pay-as-you-go before the trial ends,
-  otherwise Azure disables its resources and ingestion stops.
 
 ## 3. Resource providers
 
@@ -113,6 +111,9 @@ az role assignment create --assignee-object-id $ME --assignee-principal-type Use
 
 # 7. State container (retry after a few minutes if it returns 403 – role assignments take time to propagate)
 az storage container create --name tfstate --account-name $SA --auth-mode login
+
+# 8. Disable local users (SFTP accounts), added 2026-11-13: Entra ID is the only way in
+az storage account update -n $SA -g $RG --enable-local-user false
 ```
 
 ### Settings and why
@@ -123,6 +124,7 @@ az storage container create --name tfstate --account-name $SA --auth-mode login
 | Minimum TLS / HTTPS only | TLS 1.2 / yes | Encrypted transport only |
 | Public blob access | off | No container can be made anonymous, even by mistake |
 | Shared key access | **off** | No account keys (master passwords). Access only through Entra ID identities, which are logged and revocable. Terraform's backend uses `use_azuread_auth = true` |
+| Local users (SFTP accounts) | **off** (since 2026-11-13) | No separate username/password or SSH-key accounts on the storage; Entra ID only. Azure's default leaves them enabled |
 | Hierarchical namespace | off | Blob versioning is not supported with it |
 | Blob versioning | on | Restore the previous state if an apply corrupts it |
 | Soft delete (blobs, containers) | 30 days | Recover a deleted state file or container |
@@ -148,6 +150,8 @@ az storage container list --account-name $SA --auth-mode login -o table
 ```
 
 Result: `TLS1_2 / False / False / True`, versioning `True`, soft delete `30 / 30`, lock `CanNotDelete`, container `tfstate` present.
+
+2026-11-13: `az storage account show -n $SA -g $RG --query isLocalUserEnabled -o tsv` → `false`.
 
 **Activity log** (resource group `rg-ifec-tfstate`) shows the control-plane operations: create resource group, create
 storage account, put blob service properties, create management lock, create role assignment. Container creation is a
