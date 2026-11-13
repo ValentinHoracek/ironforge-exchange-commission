@@ -1,0 +1,25 @@
+# IFEC ingest configuration. Changes go through a pull request (change control).
+# The Forever API is undocumented; every value below was verified by probing (design doc 5.1.1).
+
+[api]
+oauth_url = "https://oauth.battle.net/token"
+base_url = "https://eu.api.blizzard.com"
+namespace = "dynamic-forever-eu"
+# The ruleset ID in the URL does not filter (all rulesets return the same houses);
+# it only has to be valid. 2 = Normal.
+ruleset_id = 2
+
+# One auction house per region x ruleset x faction. The house ID is the market key.
+[[markets]]
+house_id = 111
+region = "eu"
+ruleset = "normal"
+faction = "alliance"
+mapping = "verified"   # marker listing, 2026-11-06
+
+[[markets]]
+house_id = 114
+region = "eu"
+ruleset = "normal"
+faction = "horde"
+mapping = "inferred"   # from the ID pattern; verify with a Horde marker listing
