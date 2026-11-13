@@ -1,0 +1,3 @@
+# Always use LF line endings, on every machine and in every Git client (WSL, Windows, Sourcetree).
+# The repo is edited from both Windows and Linux; this stops CRLF from creeping in.
+* text=auto eol=lf
