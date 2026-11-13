@@ -10,4 +10,4 @@ key_vault_name           = "kv-ifec-prod-a497a1"
 
 # Exact image to run: the git commit SHA that GitHub Actions built. Set after the first
 # image is published; every change of this line is a reviewed deployment.
-image_tag = "0000000000000000000000000000000000000000"
+image_tag = "b6aae7fcefbc9c14660e29c1cfeaef40e9bb3c7a"
