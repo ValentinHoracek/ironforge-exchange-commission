@@ -20,7 +20,7 @@ A second goal: let Claude architect the DevOps part. Code, docs and commit histo
 - **Cost:** **$15 per month hard cap for everything** (raised from $5–10 on 2026-11-02); the Azure budget is set as **€15/month** (billing currency). The chosen design costs about $1–2.
 - **One location:** everything runs in **one Azure subscription**. Do not add external free-tier services (Supabase, Grafana Cloud, Databricks, MotherDuck, etc.).
 - **CI/CD:** GitHub Actions (GitHub is allowed next to Azure; runtime stays in Azure). Container images in GHCR (free), not ACR (~$5).
-- Raw data: the brief estimated about 4 GB per month uncompressed. **First measurement (2026-11-06): v1 scope (commodities of houses 111 + 114) is ~6.5 MB raw per snapshot, ~4.7 GB/month raw** – the estimate holds. Storage must stay cheap for years.
+- Raw data: the brief estimated about 4 GB per month uncompressed. **First measurement (2026-11-06): v1 scope (commodities of houses 111 + 114) is ~6.5 MB raw per snapshot, ~4.7 GB/month raw** – the estimate holds. **Second measurement (2026-11-13, live ingest test): house 114 alone 7.9 MB raw; both houses 1.6 MB gzipped per snapshot (~5x compression) → ~1.2 GB/month in Bronze, cents per month.** Storage must stay cheap for years.
 
 ## Architecture: decided (option C, "serverless, no VM") – 2026-11-02
 
@@ -104,7 +104,7 @@ The original brief is in `docs/original-brief.md` (local only, `docs/` is gitign
 - **Controls register:** wanted eventually, **not now**.
 - **Addon and domain:** later.
 
-- **Bootstrap:** documented manual bootstrap is the only allowed click-ops. Progress: see "Where we are in the process".
+- **Bootstrap:** documented manual bootstrap is the only allowed click-ops. Record: `bootstrap/README.md`.
 - **Bronze immutability:** 1-year time-based retention (WORM), locked in prod at the "done" milestone (end of December 2026) – the original trigger ("before going public") no longer applies; owner to confirm. Prod Bronze storage in its own Terraform root.
 - **Design document:** `docs/superpowers/specs/2026-11-02-ifec-design.md` (builder check done, owner answers applied).
 
@@ -126,18 +126,9 @@ History: on 2026-10-28 no Forever namespace existed (all guesses returned 403). 
 
 ## Where we are in the process
 
-- Brainstorming finished. **Design approved by the owner on 2026-11-02**: `docs/superpowers/specs/2026-11-02-ifec-design.md` – read it first; it is the source of truth over this file where they differ.
-- **Bootstrap status (2026-11-12):** full record in `bootstrap/README.md`.
-  - ✅ Blizzard developer account + API client (2026-11-06). Credentials kept locally outside the repo; they move into Key Vault later.
-  - ✅ Azure account: subscription `ifec`, **Free Trial** (spending limit on). Owner is Owner on the subscription and Global Administrator in the tenant. Azure CLI installed in WSL and logged in.
-  - ✅ Resource providers registered: Microsoft.App, Storage, KeyVault, OperationalInsights, Insights, ManagedIdentity (CostManagement and Consumption were already on).
-  - ✅ Budget `budget-ifec-monthly`: **€15/month** (owner kept EUR, the billing currency), alerts at 50/80/100 % actual + 100 % forecasted, e-mail to the owner, expires 2029-10-31. Terraform will import it later.
-  - ✅ Terraform state storage (2026-11-12): `rg-ifec-tfstate` / `stifectfstate6ca2f7` / container `tfstate`, shared keys off (backend needs `use_azuread_auth = true`), versioning + 30-day soft delete, `CanNotDelete` lock, owner has Storage Blob Data Contributor. Public network access accepted (GitHub runners).
-  - ✅ `bootstrap/README.md` written (not committed yet).
-- **Next step:** implementation plan for milestone 1 (Terraform `infra/data` + `infra/platform` for prod, ingest job, image in GHCR, job-failure alert). WoW: Forever launched 2026-11-04 and data cannot be backfilled, so getting prod ingest live early matters.
-- **Side tasks:** upgrade the Free Trial to pay-as-you-go **before the 30-day trial ends** (otherwise resources get disabled and ingest stops); verify Horde house 114 with a marker listing.
+- **Design approved by the owner on 2026-11-02**: `docs/superpowers/specs/2026-11-02-ifec-design.md` – read it first; it is the source of truth over this file where they differ.
+- **Progress, next steps and to-dos live in `PROGRESS.local.md`** (gitignored, loaded via `CLAUDE.local.md`). The public record is the commits, pull requests and `bootstrap/README.md`. Keep status notes out of this file.
 - **`docs/` is gitignored on purpose:** specs, plans and the original brief stay local. Do not commit them and do not remove the ignore rule.
-- Open topics: what "done" looks like and by when, exact Grafana panels, Delta table schemas, the domain (later).
 
 ## Working agreements
 
